@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventář Mineralogické Sbírky</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        h1 { margin-bottom: 20px; color: #343a40; }
+        
+        /* Styl kontejneru pro ID a ikonku */
+        .id-cell {
+            display: flex;
+            align-items: center;
+            gap: 10px; /* Mezera mezi číslem a ikonkou */
+        }
+
+        /* Ikonka fotoaparátu */
+        .photo-icon {
+            text-decoration: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            position: relative;
+            display: none; /* Ve výchozím stavu skryté, JS to odkryje, pokud fotka existuje */
+        }
+
+        /* Náhled obrázku (po najetí myši) */
+        .img-preview-box {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 180px; /* Šířka náhledu */
+        }
+        
+        .img-preview-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Zobrazení náhledu při hoveru */
+        .photo-icon:hover .img-preview-box {
+            display: block;
+        }
+
+        /* Na mobilu hover vypneme, aby nepřekážel */
+        @media (max-width: 768px) {
+            .img-preview-box { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <h1>🪨 Mineralogická sbírka</h1>
+        <div id="loading" class="alert alert-info">Načítám data sbírky...</div>
+        
+        <div class="table-responsive">
+            <table id="inventoryTable" class="table table-striped table-hover" style="width:100%">
+            </table>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            // NASTAVENÍ:
+            const csvFile = 'data.csv'; 
+            // Přesný název sloupce v CSV, kde je inventární číslo (např. "inventarnicislo" nebo "Inv. Číslo")
+            const idColumnName = 'inventarnicislo'; 
+            // Přípona obrázků (důležité pro malá/velká písmena, na GitHubu je rozdíl .jpg a .JPG!)
+            const imgExtension = '.jpg';
+
+            Papa.parse(csvFile, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    let data = results.data;
+                    
+                    if (data.length === 0) {
+                        $('#loading').text('Chyba: CSV soubor je prázdný.');
+                        return;
+                    }
+
+                    // Získání názvů sloupců
+                    let columns = Object.keys(data[0]).map(col => {
+                        return { title: col, data: col };
+                    });
+
+                    // Inicializace tabulky
+                    $('#inventoryTable').DataTable({
+                        data: data,
+                        columns: columns,
+                        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/cs.json' },
+                        columnDefs: [
+                            {
+                                // Najdeme sloupec s ID a upravíme jeho obsah
+                                targets: Object.keys(data[0]).indexOf(idColumnName),
+                                render: function(data, type, row) {
+                                    if (!data) return '';
+
+                                    // Cesta k obrázku: img/1.jpg
+                                    let imgPath = 'img/' + data + imgExtension;
+
+                                    // Trik: Vložíme skrytý <img> (tester), který zkusí načíst obrázek.
+                                    // Pokud se načte (onload), zobrazí odkaz s ikonkou (photo-icon).
+                                    // Pokud selže (onerror), ikonka zůstane skrytá.
+                                    return `
+                                        <div class="id-cell">
+                                            <span>${data}</span>
+                                            
+                                            <span style="display:none;">
+                                                <img src="${imgPath}" 
+                                                     onload="this.parentNode.nextElementSibling.style.display='inline-block'"
+                                                     onerror="this.remove()"> 
+                                            </span>
+
+                                            <a href="${imgPath}" target="_blank" class="photo-icon" title="Zobrazit foto">
+                                                📷
+                                                <div class="img-preview-box">
+                                                    <img src="${imgPath}" loading="lazy">
+                                                </div>
+                                            </a>
+                                        </div>
+                                    `;
+                                }
+                            }
+                        ]
+                    });
+
+                    $('#loading').hide();
+                },
+                error: function(err) {
+                    $('#loading').addClass('alert-danger').text('Chyba: ' + err);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
